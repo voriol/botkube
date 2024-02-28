@@ -32,6 +32,11 @@
 			"botkube/kubectl": {
 				"Name": "botkube/kubectl",
 				"Type": "executor",
+				"RBAC": null
+			},
+			"botkube/kubectl-2": {
+				"Name": "botkube/kubectl",
+				"Type": "executor",
 				"RBAC": {
 					"User": {
 						"Type": "Static",
@@ -43,13 +48,18 @@
 					"Group": {
 						"Type": "ChannelName",
 						"Static": {
-							"Values": []
+							"Values": null
 						},
 						"Prefix": "***"
 					}
 				}
 			},
 			"botkube/kubernetes": {
+				"Name": "botkube/kubernetes",
+				"Type": "source",
+				"RBAC": null
+			},
+			"botkube/kubernetes-2": {
 				"Name": "botkube/kubernetes",
 				"Type": "source",
 				"RBAC": {

@@ -32,7 +32,6 @@ import (
 	"github.com/kubeshop/botkube/internal/heartbeat"
 	"github.com/kubeshop/botkube/internal/insights"
 	"github.com/kubeshop/botkube/internal/kubex"
-	"github.com/kubeshop/botkube/internal/plugin"
 	"github.com/kubeshop/botkube/internal/source"
 	"github.com/kubeshop/botkube/internal/status"
 	"github.com/kubeshop/botkube/internal/storage"
@@ -47,6 +46,7 @@ import (
 	"github.com/kubeshop/botkube/pkg/maputil"
 	"github.com/kubeshop/botkube/pkg/multierror"
 	"github.com/kubeshop/botkube/pkg/notifier"
+	"github.com/kubeshop/botkube/pkg/plugin"
 	"github.com/kubeshop/botkube/pkg/sink"
 	"github.com/kubeshop/botkube/pkg/version"
 )
@@ -271,14 +271,6 @@ func run(ctx context.Context) (err error) {
 		}
 
 		// Run bots
-		if commGroupCfg.Slack.Enabled {
-			sb, err := bot.NewSlack(commGroupLogger.WithField(botLogFieldKey, "Slack"), commGroupMeta, commGroupCfg.Slack, executorFactory, analyticsReporter)
-			if err != nil {
-				return reportFatalError("while creating Slack bot", err)
-			}
-			scheduleBotNotifier(sb)
-		}
-
 		if commGroupCfg.SocketSlack.Enabled {
 			sb, err := bot.NewSocketSlack(commGroupLogger.WithField(botLogFieldKey, "SocketSlack"), commGroupMeta, commGroupCfg.SocketSlack, executorFactory, analyticsReporter)
 			if err != nil {
@@ -301,14 +293,6 @@ func run(ctx context.Context) (err error) {
 				return reportFatalError("while creating Mattermost bot", err)
 			}
 			scheduleBotNotifier(mb)
-		}
-
-		if commGroupCfg.Teams.Enabled {
-			tb, err := bot.NewTeams(commGroupLogger.WithField(botLogFieldKey, "MS Teams"), commGroupMeta, commGroupCfg.Teams, conf.Settings.ClusterName, executorFactory, analyticsReporter)
-			if err != nil {
-				return reportFatalError("while creating Teams bot", err)
-			}
-			scheduleBotNotifier(tb)
 		}
 
 		if commGroupCfg.CloudTeams.Enabled {
@@ -397,7 +381,12 @@ func run(ctx context.Context) (err error) {
 		)
 		errGroup.Go(func() error {
 			defer analytics.ReportPanicIfOccurs(logger, analyticsReporter)
-			return upgradeChecker.Run(ctx)
+			err := upgradeChecker.Run(ctx)
+			if err != nil {
+				// we ignore error to make sure that upgrade checker does not stop the agent
+				logger.WithError(err).Errorf("Failed to notify about upgrade")
+			}
+			return nil
 		})
 	}
 

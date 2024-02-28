@@ -11,11 +11,11 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
 
-	"github.com/kubeshop/botkube/internal/plugin"
 	"github.com/kubeshop/botkube/pkg/api"
 	"github.com/kubeshop/botkube/pkg/api/executor"
 	"github.com/kubeshop/botkube/pkg/bot/interactive"
 	"github.com/kubeshop/botkube/pkg/config"
+	"github.com/kubeshop/botkube/pkg/plugin"
 )
 
 // PluginExecutor provides functionality to run registered Botkube plugins.
@@ -119,6 +119,10 @@ func (e *PluginExecutor) Execute(ctx context.Context, bindings []string, slackSt
 					Mention:     cmdCtx.User.Mention,
 					DisplayName: cmdCtx.User.DisplayName,
 				},
+				ParentActivityID: cmdCtx.Conversation.ParentActivityID,
+			},
+			IncomingWebhook: executor.IncomingWebhookDetailsContext{
+				BaseSourceURL: e.cfg.Plugins.IncomingWebhook.InClusterBaseURL + "/sources/v1",
 			},
 		},
 	})

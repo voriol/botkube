@@ -10,10 +10,10 @@ import (
 	"github.com/kubeshop/botkube/internal/analytics"
 	"github.com/kubeshop/botkube/internal/audit"
 	guard "github.com/kubeshop/botkube/internal/command"
-	"github.com/kubeshop/botkube/internal/plugin"
 	"github.com/kubeshop/botkube/pkg/bot/interactive"
 	"github.com/kubeshop/botkube/pkg/config"
 	"github.com/kubeshop/botkube/pkg/execute/command"
+	"github.com/kubeshop/botkube/pkg/plugin"
 )
 
 // DefaultExecutorFactory facilitates creation of the Executor instances.
@@ -172,6 +172,7 @@ type Conversation struct {
 	SlackState       *slack.BlockActionStates
 	URL              string
 	Text             string
+	ParentActivityID string
 }
 
 // NewDefaultInput an input for NewDefault

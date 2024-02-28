@@ -30,8 +30,12 @@ import (
 )
 
 const (
-	originKeyName = "originName"
+	originKeyName            = "originName"
+	teamsBotMentionPrefixFmt = "^<at>%s</at>"
 )
+
+// mdEmojiTag finds the emoji tags
+var mdEmojiTag = regexp.MustCompile(`:(\w+):`)
 
 var _ Bot = &CloudTeams{}
 
@@ -285,7 +289,6 @@ func (b *CloudTeams) handleStreamMessage(ctx context.Context, data *pb.CloudActi
 				MessageType:    pb.MessageType_MESSAGE_EXECUTOR,
 				TeamId:         channel.teamID,
 				ConversationId: conversationRef.Conversation.ID,
-				ActivityId:     conversationRef.ActivityID, // activity ID allows us to send it as a thread message
 				Data:           raw,
 			},
 		}, nil
@@ -309,6 +312,7 @@ func (b *CloudTeams) processMessage(ctx context.Context, act schema.Activity, ch
 			SourceBindings:   channel.Bindings.Sources,
 			CommandOrigin:    b.mapToCommandOrigin(act),
 			DisplayName:      channelDisplayName,
+			ParentActivityID: act.Conversation.ID,
 		},
 		Message: trimmedMsg,
 		User: execute.UserInput{
@@ -389,7 +393,6 @@ func (b *CloudTeams) sendAgentActivity(ctx context.Context, msg interactive.Core
 			Message: &pb.Message{
 				MessageType:    pb.MessageType_MESSAGE_SOURCE,
 				TeamId:         channel.teamID,
-				ActivityId:     "", // empty so it will be sent on root instead of sending as a thread message
 				ConversationId: channel.ID,
 				Data:           raw,
 			},
@@ -494,4 +497,33 @@ func teamsCloudChannelsConfig(teams []config.TeamsBindings) map[string]teamsClou
 		}
 	}
 	return out
+}
+
+func teamsBotMentionRegex(botName string) (*regexp.Regexp, error) {
+	botMentionRegex, err := regexp.Compile(fmt.Sprintf(teamsBotMentionPrefixFmt, botName))
+	if err != nil {
+		return nil, fmt.Errorf("while compiling bot mention regex: %w", err)
+	}
+
+	return botMentionRegex, nil
+}
+
+// replaceEmojiTagsWithActualOne replaces the emoji tag with actual emoji.
+func replaceEmojiTagsWithActualOne(content string) string {
+	return mdEmojiTag.ReplaceAllStringFunc(content, func(s string) string {
+		return emojiMapping[s]
+	})
+}
+
+// emojiMapping holds mapping between emoji tags and actual ones.
+var emojiMapping = map[string]string{
+	":rocket:":                  "🚀",
+	":warning:":                 "⚠️",
+	":white_check_mark:":        "✅",
+	":arrows_counterclockwise:": "🔄",
+	":exclamation:":             "❗",
+	":cricket:":                 "🦗",
+	":no_entry_sign:":           "🚫",
+	":large_green_circle:":      "🟢",
+	":new:":                     "🆕",
 }

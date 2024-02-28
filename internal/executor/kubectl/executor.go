@@ -11,12 +11,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/kubeshop/botkube/internal/command"
-	"github.com/kubeshop/botkube/internal/executor/kubectl/accessreview"
 	"github.com/kubeshop/botkube/internal/executor/kubectl/builder"
 	"github.com/kubeshop/botkube/pkg/api"
 	"github.com/kubeshop/botkube/pkg/api/executor"
 	"github.com/kubeshop/botkube/pkg/loggerx"
-	"github.com/kubeshop/botkube/pkg/pluginx"
+	"github.com/kubeshop/botkube/pkg/plugin"
 )
 
 const (
@@ -64,7 +63,7 @@ func NewExecutor(ver string, kcRunner kcRunner) *Executor {
 	}
 }
 
-// Metadata returns details about Helm plugin.
+// Metadata returns details about Kubectl plugin.
 func (e *Executor) Metadata(context.Context) (api.MetadataOutput, error) {
 	return api.MetadataOutput{
 		Version:          e.pluginVersion,
@@ -84,7 +83,7 @@ func (e *Executor) Metadata(context.Context) (api.MetadataOutput, error) {
 
 // Execute returns a given command as response.
 func (e *Executor) Execute(ctx context.Context, in executor.ExecuteInput) (executor.ExecuteOutput, error) {
-	if err := pluginx.ValidateKubeConfigProvided(PluginName, in.Context.KubeConfig); err != nil {
+	if err := plugin.ValidateKubeConfigProvided(PluginName, in.Context.KubeConfig); err != nil {
 		return executor.ExecuteOutput{}, err
 	}
 
@@ -104,7 +103,7 @@ func (e *Executor) Execute(ctx context.Context, in executor.ExecuteInput) (execu
 		return executor.ExecuteOutput{}, err
 	}
 
-	kubeConfigPath, deleteFn, err := pluginx.PersistKubeConfig(ctx, in.Context.KubeConfig)
+	kubeConfigPath, deleteFn, err := plugin.PersistKubeConfig(ctx, in.Context.KubeConfig)
 	if err != nil {
 		return executor.ExecuteOutput{}, fmt.Errorf("while writing kubeconfig file: %w", err)
 	}
@@ -121,7 +120,7 @@ func (e *Executor) Execute(ctx context.Context, in executor.ExecuteInput) (execu
 			return executor.ExecuteOutput{}, fmt.Errorf("while creating builder dependecies: %w", err)
 		}
 
-		kcBuilder := builder.NewKubectl(scopedKubectlRunner, cfg.InteractiveBuilder, log, guard, cfg.DefaultNamespace, k8sCli.CoreV1().Namespaces(), accessreview.NewK8sAuth(k8sCli.AuthorizationV1()))
+		kcBuilder := builder.NewKubectl(scopedKubectlRunner, cfg.InteractiveBuilder, log, guard, cfg.DefaultNamespace, k8sCli.CoreV1().Namespaces(), builder.NewK8sAuth(k8sCli.AuthorizationV1()))
 		msg, err := kcBuilder.Handle(ctx, cmd, in.Context.IsInteractivitySupported, in.Context.SlackState)
 		if err != nil {
 			return executor.ExecuteOutput{}, fmt.Errorf("while running command builder: %w", err)

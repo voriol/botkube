@@ -111,7 +111,7 @@ func TestSegmentReporter_ReportCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	err = segmentReporter.ReportCommand(analytics.ReportCommandInput{
-		Platform:   config.SlackCommPlatformIntegration,
+		Platform:   config.CloudSlackCommPlatformIntegration,
 		PluginName: "botkube/kubectl",
 		Command:    "get",
 		Origin:     command.ButtonClickOrigin,
@@ -136,7 +136,7 @@ func TestSegmentReporter_ReportBotEnabled(t *testing.T) {
 	segmentReporter, segmentCli := fakeSegmentReporterWithIdentity(identity)
 
 	// when
-	err := segmentReporter.ReportBotEnabled(config.SlackCommPlatformIntegration, 1)
+	err := segmentReporter.ReportBotEnabled(config.CloudSlackCommPlatformIntegration, 1)
 	require.NoError(t, err)
 
 	// when
@@ -153,11 +153,7 @@ func TestSegmentReporter_ReportBotEnabled(t *testing.T) {
 
 func TestSegmentReporter_ReportPluginsEnabled(t *testing.T) {
 	// given
-	identity := fixIdentity()
-	segmentReporter, segmentCli := fakeSegmentReporterWithIdentity(identity)
-
-	// when
-	err := segmentReporter.ReportPluginsEnabled(map[string]config.Executors{
+	executors := map[string]config.Executors{
 		"botkube/helm_11yy1": {
 			DisplayName: "helm",
 			Plugins: map[string]config.Plugin{
@@ -215,7 +211,20 @@ func TestSegmentReporter_ReportPluginsEnabled(t *testing.T) {
 				},
 			},
 		},
-	}, map[string]config.Sources{
+		"botkube/kubectl_2": {
+			DisplayName: "kubectl",
+			Plugins: map[string]config.Plugin{
+				"botkube/kubectl": {
+					Enabled: true,
+					Config:  "{}",
+					Context: config.PluginContext{
+						RBAC: nil,
+					},
+				},
+			},
+		},
+	}
+	sources := map[string]config.Sources{
 		"botkube/kubernetes_22yy2": {
 			DisplayName: "k8s",
 			Plugins: map[string]config.Plugin{
@@ -270,11 +279,39 @@ func TestSegmentReporter_ReportPluginsEnabled(t *testing.T) {
 				},
 			},
 		},
-	})
+		"botkube/kubernetes_2": {
+			DisplayName: "kubernetes",
+			Plugins: map[string]config.Plugin{
+				"botkube/kubernetes": {
+					Enabled: true,
+					Config:  "{}",
+					Context: config.PluginContext{
+						RBAC: nil,
+					},
+				},
+			},
+		},
+	}
+
+	executors2, err := deepClone[map[string]config.Executors](executors)
+	require.NoError(t, err)
+
+	sources2, err := deepClone[map[string]config.Sources](sources)
+	require.NoError(t, err)
+
+	identity := fixIdentity()
+	segmentReporter, segmentCli := fakeSegmentReporterWithIdentity(identity)
+
+	// when
+	err = segmentReporter.ReportPluginsEnabled(executors, sources)
 	require.NoError(t, err)
 
 	// then
 	compareMessagesAgainstGoldenFile(t, segmentCli.messages)
+
+	// ensure the report doesn't modify the original maps
+	assert.Equal(t, executors2, executors)
+	assert.Equal(t, sources2, sources)
 }
 
 func TestSegmentReporter_ReportSinkEnabled(t *testing.T) {
@@ -326,7 +363,7 @@ func TestSegmentReporter_Run(t *testing.T) {
 
 	err := segmentReporter.ReportHandledEventSuccess(analytics.ReportEventInput{
 		IntegrationType:       config.BotIntegrationType,
-		Platform:              config.SlackCommPlatformIntegration,
+		Platform:              config.CloudSlackCommPlatformIntegration,
 		PluginName:            "botkube/kubernetes",
 		AnonymizedEventFields: eventDetails,
 	})
@@ -351,7 +388,7 @@ func TestSegmentReporter_Run(t *testing.T) {
 	require.NoError(t, err)
 	err = segmentReporter.ReportHandledEventSuccess(analytics.ReportEventInput{
 		IntegrationType:       config.BotIntegrationType,
-		Platform:              config.SlackCommPlatformIntegration,
+		Platform:              config.CloudSlackCommPlatformIntegration,
 		PluginName:            "botkube/kubernetes",
 		AnonymizedEventFields: eventDetails,
 	})
@@ -433,4 +470,18 @@ func fixIdentity() *analytics.Identity {
 		WorkerNodeCount:       0,
 		ControlPlaneNodeCount: 0,
 	}
+}
+
+func deepClone[T any](in any) (any, error) {
+	origJSON, err := json.Marshal(in)
+	if err != nil {
+		return nil, err
+	}
+
+	var out T
+	if err = json.Unmarshal(origJSON, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }

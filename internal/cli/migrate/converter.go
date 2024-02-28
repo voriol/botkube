@@ -13,6 +13,10 @@ import (
 	"github.com/kubeshop/botkube/pkg/ptr"
 )
 
+const (
+	defaultPluginRepoPrefix = "botkube/"
+)
+
 // Converter converts OS config into GraphQL create input.
 type Converter struct {
 	pluginNames map[string]string
@@ -105,21 +109,25 @@ func (c *Converter) convertExecutors(executors map[string]bkconfig.Executors) ([
 
 	errs := multierror.New()
 	for cfgName, conf := range executors {
-		for name, p := range conf.Plugins {
-			if !strings.HasPrefix(name, "botkube") { // skip all 3rd party plugins
+		for pName, p := range conf.Plugins {
+			if !strings.HasPrefix(pName, defaultPluginRepoPrefix) { // skip all 3rd party plugins
 				continue
 			}
 
+			repo, name, _, _ := bkconfig.DecomposePluginKey(pName)
+			pluginNameWithoutVersion := fmt.Sprintf("%s/%s", repo, name)
+
 			rawCfg, err := json.Marshal(p.Config)
 			if err != nil {
-				return nil, err
+				errs = multierror.Append(errs, fmt.Errorf("while marshalling config for executor %q: %w", name, err))
+				continue
 			}
 			displayName := conf.DisplayName
 			if displayName == "" {
-				displayName = name
+				displayName = pluginNameWithoutVersion
 			}
 			out = append(out, &gqlModel.PluginConfigurationGroupInput{
-				Name:        name,
+				Name:        pluginNameWithoutVersion,
 				DisplayName: displayName,
 				Type:        gqlModel.PluginTypeExecutor,
 				Enabled:     p.Enabled,
@@ -142,20 +150,25 @@ func (c *Converter) convertSources(sources map[string]bkconfig.Sources) ([]*gqlM
 
 	errs := multierror.New()
 	for cfgName, conf := range sources {
-		for name, p := range conf.Plugins {
-			if !strings.HasPrefix(name, "botkube") { // skip all 3rd party plugins
+		for pName, p := range conf.Plugins {
+			if !strings.HasPrefix(pName, defaultPluginRepoPrefix) { // skip all 3rd party plugins
 				continue
 			}
+
+			repo, name, _, _ := bkconfig.DecomposePluginKey(pName)
+			pluginNameWithoutVersion := fmt.Sprintf("%s/%s", repo, name)
+
 			rawCfg, err := json.Marshal(p.Config)
 			if err != nil {
-				return nil, err
+				errs = multierror.Append(errs, fmt.Errorf("while marshalling config for source %q: %w", name, err))
+				continue
 			}
 			displayName := conf.DisplayName
 			if displayName == "" {
-				displayName = name
+				displayName = pluginNameWithoutVersion
 			}
 			out = append(out, &gqlModel.PluginConfigurationGroupInput{
-				Name:        name,
+				Name:        pluginNameWithoutVersion,
 				DisplayName: displayName,
 				Type:        gqlModel.PluginTypeSource,
 				Enabled:     p.Enabled,
